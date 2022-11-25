@@ -321,6 +321,47 @@ function M.close_outline()
   M.view:close()
 end
 
+local function context_handler(response)
+  if response == nil or type(response) ~= 'table' then
+    return
+  end
+
+  local items = parser.parse(response)
+  local flattened_outline_items = parser.flatten(items)
+
+  local win = vim.api.nvim_get_current_win()
+  local hovered_line = vim.api.nvim_win_get_cursor(win)[1] - 1
+
+  local leaf_node = nil
+
+  local cb = function(value)
+    value.hovered = nil
+    if
+      value.line == hovered_line
+      or (hovered_line > value.range_start and hovered_line < value.range_end)
+    then
+      value.hovered = true
+      leaf_node = value
+    end
+  end
+
+  utils.items_dfs(cb, items)
+
+  if leaf_node then
+    for _, node in ipairs(flattened_outline_items) do
+      if node == leaf_node and node.range_start ~= 0 then
+        vim.api.nvim_win_set_cursor(win, { node.range_start + 1, 1 })
+        break
+      end
+    end
+  end
+
+end
+
+function M.go_to_context()
+  providers.request_symbols(context_handler)
+end
+
 function M.setup(opts)
   config.setup(opts)
   ui.setup_highlights()
